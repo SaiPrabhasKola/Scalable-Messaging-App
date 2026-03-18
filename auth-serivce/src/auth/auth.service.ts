@@ -5,6 +5,8 @@ import * as bcrypt from 'bcrypt'
 import { SignInDto } from './dto/signIn.dto';
 
 import * as jwt from 'jsonwebtoken';
+import * as fs from 'fs'
+import * as path from 'path'
 @Injectable()
 export class AuthService {
   constructor(
@@ -43,9 +45,15 @@ export class AuthService {
     if (!isPasswordValid) {
       return "Invalid password"
     }
-    const token = jwt.sign({ email: user.email }, process.env.JWT_SECRET!, { expiresIn: 7200 })
+    const privateKey = fs.readFileSync(
+      path.join(process.cwd(), 'keys/private.key'),
+      'utf8'
+    );
+
+    const token = jwt.sign({ id: user.id }, privateKey, { algorithm: 'RS256', expiresIn: 7200 })
     return {
       message: `hello ${user.username}`,
+      uid: user.id,
       token: token
     }
   }
