@@ -6,6 +6,7 @@
   },
   "dependencies": {
     "@prisma/client": "^7.5.0",
-    "jsonwebtoken": "^9.0.3"
+    "jsonwebtoken": "^9.0.3",
+    "socket.io-client": "^4.8.3"
   }
 }

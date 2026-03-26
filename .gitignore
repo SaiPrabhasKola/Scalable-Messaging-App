@@ -13,3 +13,5 @@ dist/
 # keys
 keys/
 *.key
+
+test
