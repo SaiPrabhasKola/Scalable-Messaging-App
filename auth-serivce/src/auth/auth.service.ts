@@ -50,7 +50,7 @@ export class AuthService {
       'utf8'
     );
 
-    const token = jwt.sign({ id: user.id }, privateKey, { algorithm: 'RS256', expiresIn: 7200 })
+    const token = jwt.sign({ id: user.id, userName: user.username }, privateKey, { algorithm: 'RS256', expiresIn: 7200 })
     return {
       message: `hello ${user.username}`,
       uid: user.id,
