@@ -33,4 +33,21 @@ export class RedisService {
             }
         });
     }
+
+    async setUserOnline(userId: string, serverId: string) {
+        await this.pubClient.hset('online_users', userId, serverId);
+    }
+
+    async removeUser(userId: string) {
+        await this.pubClient.hdel('online_userts', userId);
+    }
+
+    async getUserServer(userId: string): Promise<string | null> {
+        return await this.pubClient.hget('online_users', userId);
+    }
+
+    async isUserOnline(userId: string): Promise<boolean> {
+        const res = await this.pubClient.hexists('online_users', userId);
+        return res === 1
+    }
 }

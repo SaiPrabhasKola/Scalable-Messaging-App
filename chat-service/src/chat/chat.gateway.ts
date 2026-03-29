@@ -38,7 +38,10 @@ export class ChatGateway
   afterInit() {
     this.redisService.subscribe('chat_message', (message) => {
       // ❗ prevent duplicate emit
+
       if (message.serverId === this.serverId) return;
+
+      if (message.targetServer === this.serverId) return;
 
       const sockets = this.chatService.getUserSockets(
         message.receiverId,
@@ -51,7 +54,7 @@ export class ChatGateway
   }
 
 
-  handleConnection(client: Socket) {
+  async handleConnection(client: Socket) {
     try {
       const publicKey = fs.readFileSync(
       path.join(process.cwd(), 'keys/public.key'),
@@ -65,6 +68,8 @@ export class ChatGateway
 
       this.chatService.addUser(userId, client.id);
 
+      await this.redisService.setUserOnline(userId, this.serverId)
+
       console.log(`User ${userId} connected`);
     } catch (error) {
       console.log('Auth failed')
@@ -73,11 +78,18 @@ export class ChatGateway
   }
 
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     const userId = client.data.user?.userId;
     if (!userId) return;
 
     this.chatService.removeUser(userId, client.id);
+
+    const sockets = this.chatService.getUserSockets(userId);
+
+    if (sockets.length === 0) {
+      await this.redisService.removeUser(userId);
+      console.log(`user ${userId} offline`)
+    }
   }
 
 
@@ -104,10 +116,14 @@ export class ChatGateway
       this.server.to(socketId).emit('receiveMessage', message);
     });
 
-    await this.redisService.publish('chat_message', {
+    const targetServer = await this.redisService.getUserServer(data.targetUserId)
+
+    if (targetServer && targetServer !== this.serverId) {
+      await this.redisService.publish('chat_message', {
       ...message,
       serverId: this.serverId,
     });
+    }
 
     return message;
   }
