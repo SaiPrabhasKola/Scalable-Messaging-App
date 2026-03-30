@@ -1,7 +1,15 @@
 import { Injectable } from '@nestjs/common';
+import { QueueService } from 'src/queue/queue.service';
+import { SnowflakeService } from 'src/snowflake/snowflake.service';
 
 @Injectable()
 export class ChatService {
+
+    constructor(
+        private readonly queueService: QueueService,
+        private readonly snowflakeService: SnowflakeService
+
+    ) { }
     private userSockets = new Map<string, Set<string>>();
 
     addUser(userId: string, socketId: string) {
@@ -29,15 +37,18 @@ export class ChatService {
         return [user1, user2].sort().join('_')
     }
 
-    createMessage(senderId: string, receiverId: string, content: string) {
+    async createMessage(senderId: string, receiverId: string, content: string) {
         console.log(content)
-        return {
-            id: Date.now().toString(),
+        const message = {
+            id: this.snowflakeService.generate(),
             senderId,
             receiverId,
             conversationId: this.getConversationId(senderId, receiverId),
             content,
             createdAt: Date.now()
         }
+        await this.queueService.addMessageJob(message)
+
+        return message
     }
 }
