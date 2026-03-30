@@ -37,11 +37,9 @@ export class ChatGateway
 
   afterInit() {
     this.redisService.subscribe('chat_message', (message) => {
-      // ❗ prevent duplicate emit
 
+      console.log('at gateway ', (message))
       if (message.serverId === this.serverId) return;
-
-      if (message.targetServer === this.serverId) return;
 
       const sockets = this.chatService.getUserSockets(
         message.receiverId,
@@ -102,7 +100,7 @@ export class ChatGateway
     console.log('publishnig')
     const senderId = client.data.user.userId;
 
-    const message = this.chatService.createMessage(
+    const message = await this.chatService.createMessage(
       senderId,
       data.targetUserId,
       data.message,
@@ -118,12 +116,11 @@ export class ChatGateway
 
     const targetServer = await this.redisService.getUserServer(data.targetUserId)
 
-    if (targetServer && targetServer !== this.serverId) {
       await this.redisService.publish('chat_message', {
       ...message,
       serverId: this.serverId,
     });
-    }
+
 
     return message;
   }

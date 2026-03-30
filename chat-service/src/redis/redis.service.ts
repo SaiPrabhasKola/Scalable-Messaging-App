@@ -18,35 +18,44 @@ export class RedisService {
 
     async publish(channel: string, message: any) {
         this.init();
+        console.log('pubbn to redis')
         await this.pubClient.publish(channel, JSON.stringify(message));
     }
 
-    subscribe(channel: string, handler: (data: any) => void) {
+    async subscribe(channel: string, handler: (msg: any) => void) {
         this.init();
 
-        this.subClient.subscribe(channel);
+        console.log('SUBSCRIBING TO:', channel);
 
-        this.subClient.on('message', (ch, msg) => {
-            console.log(msg)
-            if (ch === channel) {
-                handler(JSON.parse(msg));
-            }
+        await this.subClient.subscribe(channel);
+
+        this.subClient.on('message', (ch: string, msg: string) => {
+            if (ch !== channel) return;
+
+            console.log('RAW REDIS MESSAGE:', msg);
+
+            const parsed = JSON.parse(msg);
+            handler(parsed);
         });
     }
 
     async setUserOnline(userId: string, serverId: string) {
+        this.init()
         await this.pubClient.hset('online_users', userId, serverId);
     }
 
     async removeUser(userId: string) {
-        await this.pubClient.hdel('online_userts', userId);
+        this.init()
+        await this.pubClient.hdel('online_users', userId);
     }
 
     async getUserServer(userId: string): Promise<string | null> {
+        this.init()
         return await this.pubClient.hget('online_users', userId);
     }
 
     async isUserOnline(userId: string): Promise<boolean> {
+        this.init()
         const res = await this.pubClient.hexists('online_users', userId);
         return res === 1
     }

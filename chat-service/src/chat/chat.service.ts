@@ -47,6 +47,7 @@ export class ChatService {
             content,
             createdAt: Date.now()
         }
+        console.log(message)
         await this.queueService.addMessageJob(message)
 
         return message

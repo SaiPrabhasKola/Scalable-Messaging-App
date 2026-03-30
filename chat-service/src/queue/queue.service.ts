@@ -9,7 +9,7 @@ export class QueueService {
         this.messageQ = new Queue('message-queue', {
             connection: {
                 host: 'localhost',
-                port: 6739
+                port: 6379
             }
         })
     }
