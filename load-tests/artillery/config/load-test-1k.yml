@@ -1,0 +1,236 @@
+# ============================================================================
+# LOAD TEST 1,000 CONCURRENT USERS
+# Purpose: Test WebSocket chat with 1,000 concurrent connections
+# Duration: 10 minutes with realistic ramp-up pattern
+# Target: http://localhost:4002 (Chat Service)
+# ============================================================================
+config:
+  target: "http://localhost:4002"
+  
+  # Phases for 1000 concurrent users
+  phases:
+    # Phase 1: Warm up - gentle start
+    - duration: 120
+      arrivalRate: 5
+      name: "Warm up (600 users/min)"
+    
+    # Phase 2: Ramp up to 1000 concurrent
+    - duration: 180
+      arrivalRate: 10
+      rampTo: 30
+      name: "Ramp up to 1000 concurrent"
+    
+    # Phase 3: Sustained load at peak
+    - duration: 300
+      arrivalRate: 30
+      name: "Sustained peak load (1000 users)"
+    
+    # Phase 4: Gradual cool down
+    - duration: 120
+      arrivalRate: 10
+      name: "Cool down"
+
+  # Socket.IO engine configuration
+  engines:
+    socketio-v3:
+      # Extra headers for WebSocket upgrade
+      extraHeaders:
+        User-Agent: "Artillery-LoadTest-1K"
+
+  # Custom JavaScript processor for dynamic data
+  processor: "../processors/chat-processor.js"
+
+  # Default scenario configuration
+  defaults:
+    socketio:
+      transports: ["websocket", "polling"]
+      timeout: 30000
+      reconnection: true
+      reconnectionAttempts: 3
+
+scenarios:
+  # ==========================================================================
+  # SCENARIO 1: Active Chat User (60% weight)
+  # Simulates an active user sending and receiving messages
+  # ==========================================================================
+  - name: "Active Chat User"
+    engine: socketio-v3
+    weight: 60
+    beforeScenario: "generateAuthToken"
+    afterScenario: "cleanupScenario"
+    
+    socketio:
+      auth:
+        token: "{{ token }}"
+      transports: ["websocket"]
+    
+    onConnecting: "onConnecting"
+    onConnect: "onConnect"
+    onDisconnect: "onDisconnect"
+
+    steps:
+      # Initial connection stabilization
+      - think: 2
+      
+      # Send first message (initial greeting)
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ greetingMessage }}"
+        response:
+          on: "receiveMessage"
+          capture:
+            - json: "$.id"
+              as: "messageId"
+            - json: "$.createdAt"
+              as: "sentTimestamp"
+            - json: "$.senderId"
+              as: "senderId"
+          expect:
+            - matchRegexp:
+                json: "$.id"
+                value: "^[0-9]+$"
+            - equals:
+                json: "$.senderId"
+                value: "{{ userId }}"
+        afterResponse: "onMessageReceived"
+      
+      # Simulate reading time
+      - think: 3
+      
+      # Send second message
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ randomMessage }}"
+        response:
+          on: "receiveMessage"
+          capture:
+            - json: "$.id"
+              as: "messageId2"
+        afterResponse: "onMessageReceived"
+      
+      # Conversation pause
+      - think: 5
+      
+      # Send third message
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ randomMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      # Longer pause between messages
+      - think: 8
+      
+      # Final message before disconnect
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ farewellMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      # Graceful disconnect wait
+      - think: 2
+
+  # ==========================================================================
+  # SCENARIO 2: Passive Chat User (30% weight)
+  # Simulates a user who receives messages but rarely sends
+  # ==========================================================================
+  - name: "Passive Chat User"
+    engine: socketio-v3
+    weight: 30
+    beforeScenario: "generateAuthToken"
+    afterScenario: "cleanupScenario"
+    
+    socketio:
+      auth:
+        token: "{{ token }}"
+      transports: ["websocket"]
+    
+    onConnect: "onConnect"
+    onDisconnect: "onDisconnect"
+
+    steps:
+      # Longer wait - mostly receiving
+      - think: 10
+      
+      # Occasional message
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ passiveMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      # Long wait before next interaction
+      - think: 15
+      
+      # Acknowledgment message
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ acknowledgmentMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      - think: 5
+
+  # ==========================================================================
+  # SCENARIO 3: Quick Connect/Disconnect (10% weight)
+  # Tests connection stability and cleanup
+  # ==========================================================================
+  - name: "Quick Connection Test"
+    engine: socketio-v3
+    weight: 10
+    beforeScenario: "generateAuthToken"
+    afterScenario: "cleanupScenario"
+    
+    socketio:
+      auth:
+        token: "{{ token }}"
+      transports: ["websocket"]
+    
+    onConnect: "onConnect"
+    onDisconnect: "onDisconnect"
+
+    steps:
+      # Quick message and disconnect
+      - think: 1
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "Quick test message"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      - think: 1
+
+# ============================================================================
+# PLUGINS & REPORTING
+# ============================================================================
+plugins:
+  metrics-by-endpoint:
+    useOnlyRequestNames: true
+  
+  expect:
+    reportFailures: true
+
+# Ensure proper cleanup
+ensure:
+  - maxErrorRate: 5
+  - maxResponseTime:
+      p99: 2000

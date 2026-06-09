@@ -1,0 +1,245 @@
+
+config:
+  target: "http://localhost:4002"
+  
+  # Phases for 10000 concurrent users
+  phases:
+    # Phase 1: Extended warm-up
+    - duration: 300
+      arrivalRate: 20
+      name: "Extended warm-up (6000 users)"
+    
+    # Phase 2: Ramp to 50% capacity
+    - duration: 300
+      arrivalRate: 50
+      rampTo: 100
+      name: "Ramp to 50% capacity (5000 users)"
+    
+    # Phase 3: Ramp to full 10000 concurrent
+    - duration: 360
+      arrivalRate: 100
+      rampTo: 180
+      name: "Ramp to 10000 concurrent"
+    
+    # Phase 4: Sustained peak load (extended)
+    - duration: 600
+      arrivalRate: 180
+      name: "Sustained peak load (10000 users)"
+    
+    # Phase 5: Gradual cool down
+    - duration: 300
+      arrivalRate: 50
+      name: "Cool down"
+
+  # Socket.IO engine configuration
+  engines:
+    socketio-v3:
+      extraHeaders:
+        User-Agent: "Artillery-LoadTest-10K"
+
+  # Custom JavaScript processor
+  processor: "../processors/chat-processor.js"
+
+  # Default scenario configuration
+  defaults:
+    socketio:
+      transports: ["websocket", "polling"]
+      timeout: 45000
+      reconnection: true
+      reconnectionAttempts: 5
+      reconnectionDelay: 1000
+      reconnectionDelayMax: 10000
+
+scenarios:
+  # SCENARIO 1: Active Chat User (40% weight)
+  # Reduced message frequency at 10K scale
+  - name: "Active Chat User"
+    engine: socketio-v3
+    weight: 40
+    beforeScenario: "generateAuthToken"
+    afterScenario: "cleanupScenario"
+    
+    socketio:
+      auth:
+        token: "{{ token }}"
+      transports: ["websocket"]
+    
+    onConnecting: "onConnecting"
+    onConnect: "onConnect"
+    onDisconnect: "onDisconnect"
+
+    steps:
+      - think: 3
+      
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ greetingMessage }}"
+        response:
+          on: "receiveMessage"
+          capture:
+            - json: "$.id"
+              as: "messageId"
+            - json: "$.createdAt"
+              as: "sentTimestamp"
+          expect:
+            - matchRegexp:
+                json: "$.id"
+                value: "^[0-9]+$"
+        afterResponse: "onMessageReceived"
+      
+      - think: 4
+      
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ randomMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      - think: 5
+      
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ randomMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      - think: 8
+
+  # SCENARIO 2: Passive Chat User (35% weight)
+
+  - name: "Passive Chat User"
+    engine: socketio-v3
+    weight: 35
+    beforeScenario: "generateAuthToken"
+    afterScenario: "cleanupScenario"
+    
+    socketio:
+      auth:
+        token: "{{ token }}"
+      transports: ["websocket"]
+    
+    onConnect: "onConnect"
+    onDisconnect: "onDisconnect"
+
+    steps:
+      - think: 12
+      
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ passiveMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      - think: 18
+      
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ acknowledgmentMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      - think: 10
+
+  # SCENARIO 3: Bursty User (15% weight)
+  - name: "Bursty Chat User"
+    engine: socketio-v3
+    weight: 15
+    beforeScenario: "generateAuthToken"
+    afterScenario: "cleanupScenario"
+    
+    socketio:
+      auth:
+        token: "{{ token }}"
+      transports: ["websocket"]
+    
+    onConnect: "onConnect"
+    onDisconnect: "onDisconnect"
+
+    steps:
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ greetingMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      - think: 1
+      
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "{{ randomMessage }}"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      
+      - think: 25
+
+  # SCENARIO 4: Connection Stability Test (10% weight)
+  - name: "Connection Stability Test"
+    engine: socketio-v3
+    weight: 10
+    beforeScenario: "generateAuthToken"
+    afterScenario: "cleanupScenario"
+    
+    socketio:
+      auth:
+        token: "{{ token }}"
+      transports: ["websocket"]
+    
+    onConnect: "onConnect"
+    onDisconnect: "onDisconnect"
+
+    steps:
+      - think: 1
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "Ping"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      - think: 1
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "Pong"
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+      - think: 2
+
+# ============================================================================
+# PLUGINS & REPORTING
+# ============================================================================
+plugins:
+  metrics-by-endpoint:
+    useOnlyRequestNames: true
+  
+  expect:
+    reportFailures: true
+
+# Stress test thresholds (more lenient)
+ensure:
+  - maxErrorRate: 15
+  - maxResponseTime:
+      p99: 10000

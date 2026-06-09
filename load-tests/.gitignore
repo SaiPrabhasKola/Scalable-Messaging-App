@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# Test Reports
+
+k6/reports/
+*.log
+
+# Test Data
+artillery/data/test-users.json
+*.csv
+
+# Generated Files
+dist/
+build/
+.tmp/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+.env-example
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Artifacts
+*.tar.gz
+*.zip
+
+docs
+
+scripts
+
+.env-example

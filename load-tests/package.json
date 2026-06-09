@@ -1,0 +1,23 @@
+{
+  "name": "scalable-chat-load-tests",
+  "version": "1.0.0",
+  "description": "Comprehensive load testing suite for the scalable chat application",
+  "scripts": {
+    "install:all": "npm install && cd artillery && npm install",
+    "test:http:k6": "k6 run k6/auth-load-test.js",
+    "test:ws:artillery:1k": "cd artillery && npm run test:1k",
+    "test:ws:artillery:5k": "cd artillery && npm run test:5k",
+    "test:ws:artillery:10k": "cd artillery && npm run test:10k",
+    "test:ws:artillery:smoke": "cd artillery && npm run test:smoke",
+    "test:all": "npm run test:http:k6 && npm run test:ws:artillery:1k",
+    "report:generate": "node scripts/generate-report.js",
+    "setup:test-users": "node scripts/setup-test-users.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "socket.io-client": "^4.7.0"
+  }
+}

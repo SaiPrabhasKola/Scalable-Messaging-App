@@ -1,0 +1,111 @@
+# ============================================================================
+# SMOKE TEST - WebSocket Chat Load Test
+# Purpose: Quick validation that the system handles basic load
+# Target: 100 virtual users over 2 minutes
+# ============================================================================
+config:
+  target: "http://localhost:4002"
+  phases:
+    - duration: 60
+      arrivalRate: 2
+      name: "Warm up"
+    - duration: 60
+      arrivalRate: 5
+      name: "Ramp up load"
+    - duration: 60
+      arrivalRate: 2
+      name: "Cool down"
+
+  engines:
+    socketio-v3: {}
+
+  processor: "../processors/chat-processor.js"
+
+scenarios:
+  - name: "Chat user lifecycle"
+    engine: socketio-v3
+    weight: 100
+    beforeScenario: "generateAuthToken"
+    
+    socketio:
+      transports: ["websocket"]
+      auth:
+        token: "{{ token }}"
+    
+    onConnecting: "onConnecting"
+    onConnect: "onConnect"
+    onDisconnect: "onDisconnect"
+
+    steps:
+      - think: 2
+
+      # Wait for and verify connection
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "Hello from Artillery smoke test!"
+        response:
+          on: "receiveMessage"
+          capture:
+            - json: "$.id"
+              as: "messageId"
+            - json: "$.content"
+              as: "receivedContent"
+          expect:
+            - matchRegexp:
+                json: "$.id"
+                value: "^[0-9]+$"
+        afterResponse: "onMessageReceived"
+
+      # Simulate conversation with think time
+      - think: 3
+
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "Second message in smoke test."
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+
+      # Simulate user reading messages
+      - think: 5
+
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "Final message - disconnecting soon."
+        response:
+          on: "receiveMessage"
+        afterResponse: "onMessageReceived"
+
+      # Graceful disconnect wait
+      - think: 2
+
+  - name: "Connection reliability test"
+    engine: socketio-v3
+    weight: 20
+    beforeScenario: "generateAuthToken"
+    
+    socketio:
+      transports: ["websocket"]
+      auth:
+        token: "{{ token }}"
+    
+    steps:
+      - think: 1
+      - emit:
+          channel: "sendMessage"
+          data:
+            targetUserId: "{{ targetUserId }}"
+            message: "Quick connection test"
+        response:
+          on: "receiveMessage"
+      - think: 2
+
+plugins:
+  metrics-by-endpoint:
+    useOnlyRequestNames: true

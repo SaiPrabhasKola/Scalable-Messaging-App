@@ -1,0 +1,22 @@
+{
+  "name": "chat-ws-load-tests",
+  "version": "1.0.0",
+  "description": "WebSocket load tests using Artillery for chat application",
+  "scripts": {
+    "test:smoke": "artillery run config/smoke-test.yml --output reports/smoke-test-report.json",
+    "test:1k": "artillery run config/load-test-1k.yml --output reports/load-test-1k-report.json",
+    "test:5k": "artillery run config/load-test-5k.yml --output reports/load-test-5k-report.json",
+    "test:10k": "artillery run config/load-test-10k.yml --output reports/load-test-10k-report.json",
+    "report:smoke": "artillery report reports/smoke-test-report.json",
+    "report:1k": "artillery report reports/load-test-1k-report.json",
+    "report:5k": "artillery report reports/load-test-5k-report.json",
+    "report:10k": "artillery report reports/load-test-10k-report.json"
+  },
+  "dependencies": {
+    "artillery": "^2.0.21",
+    "artillery-engine-socketio-v3": "^1.2.0",
+    "socket.io-client": "^4.7.0",
+    "jsonwebtoken": "^9.0.2",
+    "fs-extra": "^11.1.1"
+  }
+}
